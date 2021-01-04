@@ -1,45 +1,51 @@
-import galleryList from './templates/galleryList.hbs';
-import appendImagesMarkup from './js/make-Gallery-Markup';
+import './css/styles.css';
+import ImageApiService from './js/apiService';
+import refs from './js/reference';
+import {
+  openModal,
+  makePicturesMarkup,
+  clearGallery,
+  scrollToTop,
+} from './js/functions';
+import { showError, showSuccess } from './js/notification';
 
-const refs = {
-  inputForm: document.querySelector('#search-form'),
-  galleryImages: document.querySelector('.gallery'),
-  button: document.querySelector('.load-more-button'),
-};
+const imageApiService = new ImageApiService();
 
-// function appendImagesMarkup(images) {
-//   const markup = galleryList(images);
+refs.inputForm.addEventListener('submit', handleFormSubmit);
+refs.scrollBtn.addEventListener('click', () => {
+  scrollToTop();
+});
 
-//   refs.galleryImages.insertAdjacentElement('beforeend', markup);
-// }
-
-refs.inputForm.addEventListener('submit', event => {
+function handleFormSubmit(event) {
   event.preventDefault();
 
   const form = event.currentTarget;
-  const inputValue = form.elements.query.value;
-  // console.log(inputValue);
-  const url =
-    ' https://pixabay.com/api/?image_type=photo&orientation=horizontal&q=${{inputValue}}&order=latest&per_page=12&key=19735813-38939a283ca61b34fac8c005d';
+  imageApiService.query = form.elements.query.value;
 
-  fetch(url)
-    .then(res => res.json())
-    .then(({ hits }) => {
-      const markup = galleryList(hits);
+  if (imageApiService.query === '') {
+    showError();
+    clearGallery();
+    return;
+  }
+  imageApiService.resetPage();
+  imageApiService.fetchImages().then(images => {
+    clearGallery();
+    showSuccess();
+    makePicturesMarkup(images);
+    openModal();
+    event.target.reset();
+    scrollToTop();
+    refs.scrollBtn.classList.remove('is-open');
+  });
+}
 
-      refs.galleryImages.insertAdjacentHTML('beforeend', markup);
-    })
-    .catch(error => console.log(error));
-});
-
-// const url =
-//   ' https://pixabay.com/api/?image_type=photo&orientation=horizontal&q=что_искать&order=latest&per_page=12&key=19735813-38939a283ca61b34fac8c005d';
-
-// fetch(url)
-//   .then(res => res.json())
-//   .then(({ hits }) => {
-//     const markup = galleryList(hits);
-
-//     refs.galleryImages.insertAdjacentHTML('beforeend', markup);
-//   })
-//   .catch(error => console.log(error));
+const observer = new IntersectionObserver(onEntry, { rootMargin: '50px' });
+function onEntry(entries) {
+  entries.forEach(entry => {
+    if (entry.isIntersecting && imageApiService.query !== '') {
+      imageApiService.fetchImages().then(makePicturesMarkup);
+      refs.scrollBtn.classList.add('is-open');
+    }
+  });
+}
+observer.observe(refs.gate);
